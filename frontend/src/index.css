@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-darkBg: #0B0F19;
+  --color-cardBg: #111827;
+  --color-primary: #3B82F6;
+  --color-accent: #10B981;
+  --color-danger: #EF4444;
+  --color-warning: #F59E0B;
+
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "Fira Code", monospace;
+}
+
+body {
+  background-color: #ffffff;
+  color: #111827;
+  margin: 0;
+  font-family: var(--font-sans);
+}
