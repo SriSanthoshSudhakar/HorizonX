@@ -1,0 +1,19 @@
+HORIZONX - ISOLATION FOREST SENSOR ANOMALY DETECTION REPORT
+============================================================
+Total Vectors Evaluated:    13,910
+Normal Inlier Vectors:      13,214 (95.00%)
+Detected Anomaly Vectors:   696 (5.00%)
+Contamination Threshold:    5.0%
+
+Breakdown by Gas Species:
+  Ethanol        :  136 / 2565 ( 5.30%)
+  Ethylene       :  188 / 2926 ( 6.43%)
+  Ammonia        :   22 / 1641 ( 1.34%)
+  Acetaldehyde   :   17 / 1936 ( 0.88%)
+  Acetone        :  333 / 3009 (11.07%)
+  Toluene        :    0 / 1833 ( 0.00%)
+
+Breakdown by Concentration Tier:
+  Low (<60.0 PPM)         :    0 / 4685 ( 0.00%)
+  Medium (60.0-175.0 PPM) :   41 / 4625 ( 0.89%)
+  High (>175.0 PPM)       :  655 / 4600 (14.24%)

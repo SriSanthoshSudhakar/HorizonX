@@ -1,0 +1,17 @@
+HORIZONX - RANDOM FOREST GAS CLASSIFIER REPORT
+==================================================
+Overall Accuracy: 99.53%
+5-Fold CV Accuracy: 99.34%
+
+              precision    recall  f1-score   support
+
+     Ethanol       1.00      0.99      1.00       513
+    Ethylene       0.99      1.00      1.00       585
+     Ammonia       1.00      0.99      0.99       328
+Acetaldehyde       0.99      0.99      0.99       387
+     Acetone       0.99      1.00      1.00       602
+     Toluene       0.99      1.00      0.99       367
+
+    accuracy                           1.00      2782
+   macro avg       1.00      0.99      1.00      2782
+weighted avg       1.00      1.00      1.00      2782

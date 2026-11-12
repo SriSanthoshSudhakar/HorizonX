@@ -1,18 +1,51 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, avg, count
 import sys
 import os
 
-# Fix Windows PySpark issue by pointing to downloaded winutils
+# Fix Windows PySpark issue by pointing to downloaded winutils and Python executable
 os.environ["HADOOP_HOME"] = r"C:\hadoop"
+os.environ["PATH"] = r"C:\hadoop\bin;" + os.environ.get("PATH", "")
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+if "JAVA_HOME" not in os.environ:
+    os.environ["JAVA_HOME"] = r"C:\Program Files\Java\jdk-21.0.12"
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, avg, count
+from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType
 
 def main():
-    # Initialize SparkSession
+    # Initialize SparkSession with Java 17+ compatibility flags
     spark = SparkSession.builder \
         .appName("GasSensorDataProcessing") \
         .master("local[*]") \
+        .config(
+            "spark.driver.extraJavaOptions",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED "
+            "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
+            "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "
+            "--add-opens=java.base/java.io=ALL-UNNAMED "
+            "--add-opens=java.base/java.net=ALL-UNNAMED "
+            "--add-opens=java.base/java.nio=ALL-UNNAMED "
+            "--add-opens=java.base/java.util=ALL-UNNAMED "
+            "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
+            "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED "
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
+            "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
+            "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
+            "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
+            "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+        ) \
         .getOrCreate()
         
+    # Bypass Windows Hadoop NativeIO access0 link error
+    try:
+        clazz = spark._jvm.java.lang.Class.forName("org.apache.hadoop.io.nativeio.NativeIO")
+        field = clazz.getDeclaredField("nativeLoaded")
+        field.setAccessible(True)
+        field.setBoolean(None, False)
+    except Exception as e:
+        print("Note: NativeIO bypass warning (safe to ignore):", e)
+
     print("Spark Session created successfully.")
 
     # Read all .dat files from the gas sensor directory
@@ -46,12 +79,15 @@ def main():
     # Parse the RDD and filter out any empty lines
     parsed_rdd = rdd.map(parse_line).filter(lambda x: x is not None)
 
-    # Define columns
-    columns = ["gas_type", "concentration"] + [f"feature_{i}" for i in range(1, 129)]
+    # Explicit schema definition to avoid schema inference worker crashes
+    schema = StructType([
+        StructField("gas_type", IntegerType(), True),
+        StructField("concentration", DoubleType(), True)
+    ] + [StructField(f"feature_{i}", DoubleType(), True) for i in range(1, 129)])
     
     # Create DataFrame
     print("Creating DataFrame...")
-    df = spark.createDataFrame(parsed_rdd, schema=columns)
+    df = spark.createDataFrame(parsed_rdd, schema=schema)
     
     # ---------------------------------------------------------
     # DATA PROCESSING - TRANSFORMATIONS & ACTIONS
@@ -81,7 +117,7 @@ def main():
     # ---------------------------------------------------------
     
     # Save the processed DataFrame to a proper location in the analytics folder
-    output_csv_path = "C:/Horizon/analytics/processed_gas_sensor_data_csv"
+    output_csv_path = "C:/Horizon/output/processed_gas_sensor_data_csv"
     print(f"\nSaving processed data to: {output_csv_path}")
     
     # Write to single CSV file for convenience (coalesce to 1)
