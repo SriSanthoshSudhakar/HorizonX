@@ -3,9 +3,12 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
+import LiveAnomalyNotifier from './components/LiveAnomalyNotifier';
 import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
 import Incidents from './pages/Incidents';
+import Alerts from './pages/Alerts';
 import Prototype from './pages/Prototype';
 import Login from './pages/Login';
 
@@ -15,6 +18,7 @@ function App() {
       <Router>
         <div className="min-h-screen bg-white text-gray-900">
           <Navbar />
+          <LiveAnomalyNotifier />
           <Routes>
             {/* Public Route: Accessible to everyone */}
             <Route path="/" element={<Home />} />
@@ -23,6 +27,14 @@ function App() {
             <Route path="/login" element={<Login />} />
 
             {/* Protected Routes: Accessible only after Facial Recognition Login */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/prototype" 
               element={
@@ -52,6 +64,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Incidents />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/alerts" 
+              element={
+                <ProtectedRoute>
+                  <Alerts />
                 </ProtectedRoute>
               } 
             />

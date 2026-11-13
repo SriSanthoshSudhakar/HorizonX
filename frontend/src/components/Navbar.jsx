@@ -92,6 +92,7 @@ const Navbar = () => {
         {/* DESKTOP LINKS */}
         <div className="hidden md:flex items-center space-x-8">
           <NavItem to="/" label="Home" />
+          <NavItem to="/dashboard" label="Live Dashboard" />
           <NavItem to="/prototype" label="Prototype" />
           <NavItem to="/analytics" label="Analytics" />
           <NavItem to="/incidents" label="Incidents" />
@@ -221,6 +222,7 @@ const Navbar = () => {
       >
         <div className="flex flex-col space-y-2">
           <MobileNavItem to="/" label="Home" onClick={() => setMobileMenuOpen(false)} open={mobileMenuOpen} delay="delay-[40ms]" />
+          <MobileNavItem to="/dashboard" label="Live Dashboard" onClick={() => setMobileMenuOpen(false)} open={mobileMenuOpen} delay="delay-[60ms]" />
           <MobileNavItem to="/prototype" label="Prototype" onClick={() => setMobileMenuOpen(false)} open={mobileMenuOpen} delay="delay-[80ms]" />
           <MobileNavItem to="/analytics" label="Analytics" onClick={() => setMobileMenuOpen(false)} open={mobileMenuOpen} delay="delay-[120ms]" />
           <MobileNavItem to="/incidents" label="Incidents" onClick={() => setMobileMenuOpen(false)} open={mobileMenuOpen} delay="delay-[160ms]" />

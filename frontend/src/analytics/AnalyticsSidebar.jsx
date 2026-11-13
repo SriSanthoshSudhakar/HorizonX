@@ -110,6 +110,17 @@ export const AnalyticsSidebar = ({ activePage, onSelectPage, isOpen = true, onTo
           </nav>
         </div>
 
+        {/* Live Stream Direct Link */}
+        <div className="p-4 border-t border-neutral-900">
+          <Link
+            to="/dashboard"
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-semibold border border-emerald-500/30 transition"
+          >
+            <Activity className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span className="truncate">Live Hardware Stream</span>
+          </Link>
+        </div>
+
       </aside>
     </>
   );
