@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Radio,
   Activity,
   Sliders,
   Waves,
@@ -11,9 +12,10 @@ import {
 } from 'lucide-react';
 
 export const AnalyticsSidebar = ({ activePage, onSelectPage, isOpen = true, onToggle }) => {
-  // Professional, clean, and simple navigation labels matching user specification
+  // Navigation sections matching Analytics page structure
   const navPages = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'live', label: 'Live Dashboard', icon: Radio },
     { id: 'topography', label: 'Topography', icon: Activity },
     { id: 'sensors', label: 'Sensors', icon: Sliders },
     { id: 'dynamics', label: 'Gas Drift', icon: Waves },
@@ -104,21 +106,13 @@ export const AnalyticsSidebar = ({ activePage, onSelectPage, isOpen = true, onTo
                 >
                   <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-black' : 'text-neutral-400 group-hover:text-white'}`} />
                   <span className="truncate">{item.label}</span>
+                  {item.id === 'live' && (
+                    <span className="ml-auto w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  )}
                 </button>
               );
             })}
           </nav>
-        </div>
-
-        {/* Live Stream Direct Link */}
-        <div className="p-4 border-t border-neutral-900">
-          <Link
-            to="/dashboard"
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-semibold border border-emerald-500/30 transition"
-          >
-            <Activity className="w-4 h-4 shrink-0 text-emerald-400" />
-            <span className="truncate">Live Hardware Stream</span>
-          </Link>
         </div>
 
       </aside>

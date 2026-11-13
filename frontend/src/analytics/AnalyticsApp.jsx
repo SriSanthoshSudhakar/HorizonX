@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import AnalyticsSidebar from './AnalyticsSidebar';
 import MetricCards from './MetricCards';
+import LiveAnalyticsSection from './LiveAnalyticsSection';
 import {
   Plotly3DSurface,
   PlotlyCorrelationHeatmap,
@@ -42,7 +43,7 @@ import {
   X,
   Menu
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -55,7 +56,10 @@ const getLastName = (fullName) => {
 export const AnalyticsApp = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activePage, setActivePage] = useState('overview');
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const initialTab = searchParams.get('tab') || 'overview';
+  const [activePage, setActivePage] = useState(initialTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
@@ -381,6 +385,11 @@ export const AnalyticsApp = () => {
               </div>
 
             </div>
+          )}
+
+          {/* ================= PAGE: LIVE HARDWARE DASHBOARD ================= */}
+          {activePage === 'live' && (
+            <LiveAnalyticsSection />
           )}
 
           {/* ================= PAGE 2: TOPOGRAPHY (7 CHARTS/DASHBOARDS) ================= */}

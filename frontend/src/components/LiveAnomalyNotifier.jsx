@@ -136,11 +136,11 @@ const LiveAnomalyNotifier = () => {
             >
               Dismiss
             </button>
-            {location.pathname !== '/dashboard' && (
+            {location.pathname !== '/analytics' && (
               <button
                 onClick={() => {
                   handleDismiss();
-                  navigate('/dashboard');
+                  navigate('/analytics?tab=live');
                 }}
                 className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium flex items-center space-x-1 transition cursor-pointer shadow-md"
               >

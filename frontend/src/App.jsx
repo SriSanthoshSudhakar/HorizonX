@@ -29,11 +29,7 @@ function App() {
             {/* Protected Routes: Accessible only after Facial Recognition Login */}
             <Route 
               path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
+              element={<Navigate to="/analytics?tab=live" replace />} 
             />
             <Route 
               path="/prototype" 
