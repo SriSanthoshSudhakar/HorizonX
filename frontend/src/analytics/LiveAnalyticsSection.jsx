@@ -501,7 +501,7 @@ export const LiveAnalyticsSection = () => {
               <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200/70">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${isFanOn ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
-                    <Wind className={`w-4 h-4 ${isFanOn ? 'animate-spin' : ''}`} />
+                    <Wind className="w-4 h-4" />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-900">L298N Exhaust Ventilation</p>

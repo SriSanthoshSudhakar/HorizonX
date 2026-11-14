@@ -307,7 +307,7 @@ const Dashboard = () => {
               </span>
             </div>
             <div className="flex items-center space-x-3 mt-1">
-              <Wind className={`w-8 h-8 ${isFanOn ? 'text-emerald-400 animate-spin' : 'text-neutral-600'}`} />
+              <Wind className={`w-8 h-8 ${isFanOn ? 'text-emerald-400' : 'text-neutral-600'}`} />
               <div>
                 <span className="text-xl sm:text-2xl font-black font-mono text-white">
                   {isFanOn ? 'VENTILATING' : 'IDLE'}
