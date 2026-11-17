@@ -7,8 +7,10 @@ from database.connection import get_db_cursor
 router = APIRouter(prefix="/api/live", tags=["Live Hardware Telemetry"])
 
 # In-memory notification queue for instant toast delivery
+import time
 _latest_anomaly_alert: Optional[Dict[str, Any]] = None
 _dismissed_alert_ids = set()
+_last_occupancy_time: float = 0.0
 
 class ESP32TelemetryPayload(BaseModel):
     device_id: Optional[str] = "HORIZONX_ESP32_01"
@@ -33,34 +35,63 @@ class ESP32TelemetryPayload(BaseModel):
 def evaluate_telemetry_anomaly(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Evaluates incoming hardware sensor telemetry for anomalies.
-    Alerts STRICTLY when MQ sensor is 1200 and above (smoke/gas surge).
+    Alerts when MQ sensor is >= 1200 or smoke is detected, and flags CRITICAL
+    when an occupant (hand/face) is detected in front of the ultrasonic sensor.
     """
+    global _last_occupancy_time
+    now = time.time()
+
     mq1 = data.get("mq2_sensor_1") or 0
     mq2 = data.get("mq2_sensor_2") or 0
-    occupancy = bool(data.get("object_detected"))
+    hazard_flag = bool(data.get("hazard_detected")) or bool(data.get("gas_event"))
 
-    # Strict condition: MQ sensor 1200+
-    is_smoke_or_gas = (mq1 >= 1200) or (mq2 >= 1200)
+    # Parse ultrasonic distance
+    dist = data.get("distance_cm")
+    try:
+        dist_val = float(dist) if dist is not None else None
+    except (ValueError, TypeError):
+        dist_val = None
+
+    # Ultrasonic occupancy: hand or face detected in front of sensor (typically within 60 cm)
+    is_near_ultrasonic = (dist_val is not None and 0.5 < dist_val <= 60.0)
+    instant_occupancy = (
+        is_near_ultrasonic
+        or bool(data.get("object_detected"))
+        or bool(data.get("occupancy_event"))
+        or (data.get("occupancy_status") in ["POSSIBLE_OCCUPANCY", "OCCUPIED"])
+    )
+
+    if instant_occupancy:
+        _last_occupancy_time = now
+
+    # Latch occupancy for 15s during active hazard so alerts do not drop on ultrasonic pulse jitter
+    is_occupancy_active = instant_occupancy or ((now - _last_occupancy_time) < 15.0)
+
+    # Smoke / Gas condition: MQ sensor >= 1200 ADC or hardware smoke flag (elevated above 800)
+    is_smoke_or_gas = (mq1 >= 1200) or (mq2 >= 1200) or (hazard_flag and (mq1 >= 800 or mq2 >= 800))
 
     if is_smoke_or_gas:
         is_anomaly = True
-        if occupancy:
+        dist_text = f"at {dist_val:.1f} cm" if dist_val else "in sensor zone"
+        if is_occupancy_active:
             severity = "CRITICAL"
-            reason = f"CRITICAL: Smoke/Gas hazard detected (MQ1: {mq1}, MQ2: {mq2} >= 1200) with compartment occupancy!"
-            anomaly_score = 0.98
+            reason = f"CRITICAL: Occupancy detected ({dist_text}) in active smoke/gas zone (MQ1: {mq1}, MQ2: {mq2})!"
+            anomaly_score = 0.99
         else:
             severity = "HIGH"
-            reason = f"HAZARD: Elevated smoke/gas spike detected (MQ1: {mq1}, MQ2: {mq2} >= 1200). Exhaust ventilation activated."
+            reason = f"HAZARD: Elevated smoke/gas detected (MQ1: {mq1}, MQ2: {mq2}). Exhaust ventilation active."
             anomaly_score = 0.85
     else:
         is_anomaly = False
         severity = "NORMAL"
-        reason = f"Nominal baseline - MQ sensors below 1200 ADC threshold (MQ1: {mq1}, MQ2: {mq2})."
+        reason = f"Nominal baseline - MQ sensors below threshold (MQ1: {mq1}, MQ2: {mq2})."
         anomaly_score = 0.05
 
     return {
         "is_anomaly": is_anomaly,
         "severity": severity,
+        "is_occupancy": is_occupancy_active,
+        "distance_cm": dist_val,
         "anomaly_reason": reason,
         "anomaly_score": anomaly_score
     }
@@ -138,9 +169,10 @@ async def ingest_live_telemetry(payload: ESP32TelemetryPayload):
             "mq2_1": data_dict.get("mq2_sensor_1"),
             "mq2_2": data_dict.get("mq2_sensor_2"),
             "temperature": data_dict.get("temperature"),
-            "distance_cm": data_dict.get("distance_cm"),
-            "occupancy": data_dict.get("occupancy_status"),
-            "hazard_detected": bool(data_dict.get("hazard_detected")),
+            "distance_cm": anomaly_info.get("distance_cm") or data_dict.get("distance_cm"),
+            "occupancy": "POSSIBLE_OCCUPANCY" if anomaly_info.get("is_occupancy") else "NO_OBJECT",
+            "object_detected": bool(anomaly_info.get("is_occupancy")),
+            "hazard_detected": True,
             "timestamp": datetime.now().isoformat()
         }
     else:
@@ -232,29 +264,23 @@ def get_live_alerts():
 
     # Check in-memory active alert first
     if _latest_anomaly_alert and _latest_anomaly_alert.get("id") not in _dismissed_alert_ids:
-        mq1 = _latest_anomaly_alert.get("mq2_1") or 0
-        mq2 = _latest_anomaly_alert.get("mq2_2") or 0
-        if (mq1 >= 1200) or (mq2 >= 1200):
-            active_alert = _latest_anomaly_alert
+        active_alert = _latest_anomaly_alert
 
     # If memory is clear, check whether the latest database reading is currently in an active hazard state
     elif latest_row and latest_row["id"] not in _dismissed_alert_ids:
         r = dict(latest_row)
-        mq1 = r.get("mq2_sensor_1") or 0
-        mq2 = r.get("mq2_sensor_2") or 0
-        
-        # STRICT CONDITION: Alert ONLY if MQ >= 1200
-        if (mq1 >= 1200) or (mq2 >= 1200):
+        if r.get("is_anomaly"):
             active_alert = {
                 "id": r["id"],
                 "device_id": r["device_id"],
-                "severity": "CRITICAL" if r.get("object_detected") else "HIGH",
+                "severity": "CRITICAL" if (r.get("object_detected") or r.get("occupancy_status") == "POSSIBLE_OCCUPANCY") else "HIGH",
                 "reason": r["anomaly_reason"],
-                "mq2_1": mq1,
-                "mq2_2": mq2,
-                "temperature": float(r["temperature"]) if r["temperature"] else None,
-                "distance_cm": float(r["distance_cm"]) if r["distance_cm"] else None,
-                "occupancy": r["occupancy_status"],
+                "mq2_1": r.get("mq2_sensor_1"),
+                "mq2_2": r.get("mq2_sensor_2"),
+                "temperature": float(r["temperature"]) if r.get("temperature") else None,
+                "distance_cm": float(r["distance_cm"]) if r.get("distance_cm") else None,
+                "occupancy": "POSSIBLE_OCCUPANCY" if (r.get("object_detected") or r.get("occupancy_status") == "POSSIBLE_OCCUPANCY") else "NO_OBJECT",
+                "object_detected": bool(r.get("object_detected")),
                 "hazard_detected": True,
                 "timestamp": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"])
             }

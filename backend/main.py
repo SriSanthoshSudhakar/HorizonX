@@ -71,9 +71,10 @@ async def receive_sensor_data(request: Request):
             "mq2_1": payload.get("mq2_sensor_1"),
             "mq2_2": payload.get("mq2_sensor_2"),
             "temperature": payload.get("temperature"),
-            "distance_cm": payload.get("distance_cm"),
-            "occupancy": payload.get("occupancy_status"),
-            "hazard_detected": bool(payload.get("hazard_detected")),
+            "distance_cm": anomaly_info.get("distance_cm") or payload.get("distance_cm"),
+            "occupancy": "POSSIBLE_OCCUPANCY" if anomaly_info.get("is_occupancy") else "NO_OBJECT",
+            "object_detected": bool(anomaly_info.get("is_occupancy")),
+            "hazard_detected": True,
             "timestamp": datetime.now().isoformat()
         }
     else:

@@ -4,6 +4,29 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
+const playAlarmSound = (critical = false) => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = critical ? 'sawtooth' : 'sine';
+    osc.frequency.setValueAtTime(critical ? 880 : 587.33, ctx.currentTime);
+    if (critical) {
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.35);
+    }
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch (e) {
+    // Ignore audio restriction
+  }
+};
+
 const LiveAnomalyNotifier = () => {
   const [activeAlert, setActiveAlert] = useState(null);
   const [dismissedId, setDismissedId] = useState(null);
@@ -20,9 +43,18 @@ const LiveAnomalyNotifier = () => {
         const data = await res.json();
         
         if (isMounted) {
-          if (data.active_alert && data.active_alert.id !== dismissedId) {
-            setActiveAlert(data.active_alert);
-          } else if (!data.active_alert) {
+          if (data.active_alert) {
+            const isCrit = data.active_alert.severity === 'CRITICAL' || data.active_alert.occupancy === 'POSSIBLE_OCCUPANCY';
+            // Escalate to critical even if previous warning was dismissed
+            if (isCrit || data.active_alert.id !== dismissedId) {
+              setActiveAlert(prev => {
+                if (!prev || (isCrit && prev.severity !== 'CRITICAL')) {
+                  playAlarmSound(isCrit);
+                }
+                return data.active_alert;
+              });
+            }
+          } else {
             setActiveAlert(null);
           }
         }
@@ -31,9 +63,9 @@ const LiveAnomalyNotifier = () => {
       }
     };
 
-    // Check immediately and poll every 2.5 seconds
+    // Check immediately and poll every 2.0 seconds
     checkAlerts();
-    const interval = setInterval(checkAlerts, 2500);
+    const interval = setInterval(checkAlerts, 2000);
 
     return () => {
       isMounted = false;
@@ -58,10 +90,12 @@ const LiveAnomalyNotifier = () => {
 
   if (!activeAlert) return null;
 
-  // Strict check: Only show alert notification if MQ sensor is >= 1200
+  // Show notification if MQ >= 1200, smoke detected, OR occupancy detected in hazard zone
   const isMQSurge = (activeAlert.mq2_1 >= 1200) || (activeAlert.mq2_2 >= 1200);
+  const isSmoke = Boolean(activeAlert.hazard_detected);
+  const isOccupancyAlert = activeAlert.severity === 'CRITICAL' || activeAlert.occupancy === 'POSSIBLE_OCCUPANCY' || Boolean(activeAlert.object_detected);
 
-  if (!isMQSurge) {
+  if (!isMQSurge && !isSmoke && !isOccupancyAlert) {
     return null;
   }
 
@@ -121,10 +155,12 @@ const LiveAnomalyNotifier = () => {
                   Temp: <strong>{activeAlert.temperature}°C</strong>
                 </span>
               )}
-              {activeAlert.occupancy === 'POSSIBLE_OCCUPANCY' && (
-                <span className="px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800 flex items-center space-x-1 font-semibold">
-                  <UserCheck className="w-3 h-3" />
-                  <span>Occupancy Detected</span>
+              {(activeAlert.occupancy === 'POSSIBLE_OCCUPANCY' || activeAlert.object_detected) && (
+                <span className="px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800 flex items-center space-x-1 font-semibold animate-pulse">
+                  <UserCheck className="w-3.5 h-3.5 text-red-400" />
+                  <span>
+                    Occupancy Detected {activeAlert.distance_cm ? `(${activeAlert.distance_cm} cm)` : ''}
+                  </span>
                 </span>
               )}
             </div>

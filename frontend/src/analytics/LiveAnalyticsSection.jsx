@@ -56,7 +56,7 @@ export const LiveAnalyticsSection = () => {
   }, []);
 
 
-  const isHazard = (latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200);
+  const isHazard = latestData?.is_anomaly || (latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200) || latestData?.hazard_detected;
   const isOccupancy = latestData?.object_detected || latestData?.occupancy_status === 'POSSIBLE_OCCUPANCY';
   const isFanOn = latestData?.fan_status;
 
@@ -247,8 +247,8 @@ export const LiveAnalyticsSection = () => {
         </div>
       </div>
 
-      {/* ANOMALY HAZARD ALERT CALLOUT (Strictly when MQ >= 1200) */}
-      {Boolean((latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200)) && (
+      {/* ANOMALY HAZARD ALERT CALLOUT */}
+      {Boolean(latestData?.is_anomaly || (latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200) || latestData?.hazard_detected) && (
         <div className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all duration-300 ${
           latestData?.severity === 'CRITICAL' 
             ? 'bg-rose-50/70 border-rose-200 text-rose-950' 
