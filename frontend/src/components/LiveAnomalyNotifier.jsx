@@ -58,11 +58,10 @@ const LiveAnomalyNotifier = () => {
 
   if (!activeAlert) return null;
 
-  // Strict check: Only show alert notification if MQ sensor is >= 1200 or smoke hazard is detected
+  // Strict check: Only show alert notification if MQ sensor is >= 1200
   const isMQSurge = (activeAlert.mq2_1 >= 1200) || (activeAlert.mq2_2 >= 1200);
-  const isSmokeDetected = Boolean(activeAlert.hazard_detected);
 
-  if (!isMQSurge && !isSmokeDetected) {
+  if (!isMQSurge) {
     return null;
   }
 

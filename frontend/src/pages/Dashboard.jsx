@@ -70,7 +70,7 @@ const Dashboard = () => {
     }
   };
 
-  const isHazard = latestData?.hazard_detected || (latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200);
+  const isHazard = (latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200);
   const isOccupancy = latestData?.object_detected || latestData?.occupancy_status === 'POSSIBLE_OCCUPANCY';
   const isFanOn = latestData?.fan_status;
 
@@ -137,8 +137,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ANOMALY / HAZARD BANNER (When Active) */}
-        {latestData?.is_anomaly && (
+        {/* ANOMALY / HAZARD BANNER (When MQ >= 1200) */}
+        {Boolean((latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200)) && (
           <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 transition-all duration-300 ${
             latestData?.severity === 'CRITICAL' 
               ? 'bg-red-950/40 border-red-800 text-red-200 shadow-lg shadow-red-950/30' 

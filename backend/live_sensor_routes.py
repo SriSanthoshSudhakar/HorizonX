@@ -33,22 +33,20 @@ class ESP32TelemetryPayload(BaseModel):
 def evaluate_telemetry_anomaly(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Evaluates incoming hardware sensor telemetry for anomalies.
-    Alerts STRICTLY when MQ sensor is 1200 and above OR smoke/gas hazard is detected.
+    Alerts STRICTLY when MQ sensor is 1200 and above (smoke/gas surge).
     """
     mq1 = data.get("mq2_sensor_1") or 0
     mq2 = data.get("mq2_sensor_2") or 0
-    hazard = bool(data.get("hazard_detected"))
-    gas_event = bool(data.get("gas_event"))
     occupancy = bool(data.get("object_detected"))
 
-    # Strict condition: MQ sensor 1200+ OR smoke/gas hazard detected
-    is_smoke_or_gas = (mq1 >= 1200) or (mq2 >= 1200) or hazard or gas_event
+    # Strict condition: MQ sensor 1200+
+    is_smoke_or_gas = (mq1 >= 1200) or (mq2 >= 1200)
 
     if is_smoke_or_gas:
         is_anomaly = True
         if occupancy:
             severity = "CRITICAL"
-            reason = f"CRITICAL: Smoke/Gas hazard detected (MQ1: {mq1}, MQ2: {mq2}) with compartment occupancy!"
+            reason = f"CRITICAL: Smoke/Gas hazard detected (MQ1: {mq1}, MQ2: {mq2} >= 1200) with compartment occupancy!"
             anomaly_score = 0.98
         else:
             severity = "HIGH"
@@ -57,7 +55,7 @@ def evaluate_telemetry_anomaly(data: Dict[str, Any]) -> Dict[str, Any]:
     else:
         is_anomaly = False
         severity = "NORMAL"
-        reason = "Nominal baseline - MQ sensors below 1200 ADC threshold and no smoke detected."
+        reason = f"Nominal baseline - MQ sensors below 1200 ADC threshold (MQ1: {mq1}, MQ2: {mq2})."
         anomaly_score = 0.05
 
     return {
@@ -236,8 +234,7 @@ def get_live_alerts():
     if _latest_anomaly_alert and _latest_anomaly_alert.get("id") not in _dismissed_alert_ids:
         mq1 = _latest_anomaly_alert.get("mq2_1") or 0
         mq2 = _latest_anomaly_alert.get("mq2_2") or 0
-        haz = _latest_anomaly_alert.get("hazard_detected")
-        if (mq1 >= 1200) or (mq2 >= 1200) or haz:
+        if (mq1 >= 1200) or (mq2 >= 1200):
             active_alert = _latest_anomaly_alert
 
     # If memory is clear, check whether the latest database reading is currently in an active hazard state
@@ -245,10 +242,9 @@ def get_live_alerts():
         r = dict(latest_row)
         mq1 = r.get("mq2_sensor_1") or 0
         mq2 = r.get("mq2_sensor_2") or 0
-        haz = bool(r.get("hazard_detected")) or bool(r.get("gas_event"))
         
-        # STRICT CONDITION: Alert ONLY if MQ >= 1200 or smoke hazard detected
-        if (mq1 >= 1200) or (mq2 >= 1200) or haz:
+        # STRICT CONDITION: Alert ONLY if MQ >= 1200
+        if (mq1 >= 1200) or (mq2 >= 1200):
             active_alert = {
                 "id": r["id"],
                 "device_id": r["device_id"],
@@ -259,7 +255,7 @@ def get_live_alerts():
                 "temperature": float(r["temperature"]) if r["temperature"] else None,
                 "distance_cm": float(r["distance_cm"]) if r["distance_cm"] else None,
                 "occupancy": r["occupancy_status"],
-                "hazard_detected": haz,
+                "hazard_detected": True,
                 "timestamp": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"])
             }
 
