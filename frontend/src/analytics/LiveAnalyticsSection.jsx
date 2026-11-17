@@ -255,7 +255,7 @@ export const LiveAnalyticsSection = () => {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>{latestData?.device_id || 'ESP32_01'}</span>
             <span className="text-slate-300">|</span>
-            <span className="text-[10px] text-slate-400">10.135.195.220:8000</span>
+            <span className="text-[10px] text-slate-400">10.183.170.220:8000</span>
           </div>
 
           <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
@@ -294,8 +294,8 @@ export const LiveAnalyticsSection = () => {
         </div>
       </div>
 
-      {/* ANOMALY HAZARD ALERT CALLOUT (Clean Untitled UI Callout Style) */}
-      {latestData?.is_anomaly && (
+      {/* ANOMALY HAZARD ALERT CALLOUT (Only when MQ >= 1200 or smoke detected) */}
+      {Boolean((latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200) || latestData?.hazard_detected) && (
         <div className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition-all duration-300 ${
           latestData?.severity === 'CRITICAL' 
             ? 'bg-rose-50/70 border-rose-200 text-rose-950' 

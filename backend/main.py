@@ -60,7 +60,7 @@ async def receive_sensor_data(request: Request):
         saved_record = {}
         record_id = None
 
-    # Trigger live notification alert if anomalous
+    # Trigger live notification alert strictly when anomalous (MQ >= 1200 or smoke hazard)
     if anomaly_info["is_anomaly"]:
         from datetime import datetime
         live_sensor_routes._latest_anomaly_alert = {
@@ -73,8 +73,12 @@ async def receive_sensor_data(request: Request):
             "temperature": payload.get("temperature"),
             "distance_cm": payload.get("distance_cm"),
             "occupancy": payload.get("occupancy_status"),
+            "hazard_detected": bool(payload.get("hazard_detected")),
             "timestamp": datetime.now().isoformat()
         }
+    else:
+        # Clear active alert when readings return to normal
+        live_sensor_routes._latest_anomaly_alert = None
 
     return {
         "status": "success",

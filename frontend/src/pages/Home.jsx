@@ -91,15 +91,15 @@ const Home = () => {
 
   const showcaseItems = [
     {
-      title: "HAERIS Cylinder Module",
+      title: "HorizonX Cylinder Module",
       tag: "3D CAD Prototype",
       desc: "Anodized titanium outer hull with integrated pneumatic isolation valves and multi-gas chamber arrays.",
       link: "/prototype",
-      action: "Explore 3D Digital Twin",
+      action: "Explore 3D Product Model",
       stat: "110 Meshes • 14.7 PSI"
     },
     {
-      title: "D3 Sensor Chromatography",
+      title: "Sensor Chromatography",
       tag: "Interactive Analytics",
       desc: "Live multi-channel gas scatter distributions, correlation heatmaps, and hazard cutoff thresholds.",
       link: "/analytics",
@@ -107,7 +107,7 @@ const Home = () => {
       stat: "13,910 Samples Analyzed"
     },
     {
-      title: "Recent Spaceflight Gas Leaks",
+      title: "Recent Spacecraft Gas Leaks",
       tag: "Recent Incidents",
       desc: "Documented real-world spacecraft gas leaks across ISS, Crew Dragon, Artemis II, and Starliner in the past 2 years before HorizonX launch.",
       link: "/incidents",

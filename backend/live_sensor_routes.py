@@ -1,11 +1,3 @@
-"""
-HorizonX - Live Hardware Telemetry & Real-Time Anomaly Router
--------------------------------------------------------------
-Receives live telemetry from ESP32 / Arduino microcontrollers over Wi-Fi,
-performs real-time anomaly evaluation, persists telemetry to PostgreSQL (live_sensor_telemetry),
-and exposes live polling APIs for the web dashboard and notification banners.
-"""
-
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
@@ -40,41 +32,33 @@ class ESP32TelemetryPayload(BaseModel):
 
 def evaluate_telemetry_anomaly(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Evaluates incoming hardware sensor telemetry for anomalies,
-    volatile gas surges, and hazardous compartment occupancy.
+    Evaluates incoming hardware sensor telemetry for anomalies.
+    Alerts STRICTLY when MQ sensor is 1200 and above OR smoke/gas hazard is detected.
     """
     mq1 = data.get("mq2_sensor_1") or 0
     mq2 = data.get("mq2_sensor_2") or 0
     hazard = bool(data.get("hazard_detected"))
     gas_event = bool(data.get("gas_event"))
     occupancy = bool(data.get("object_detected"))
-    temp = data.get("temperature")
 
-    is_anomaly = False
-    severity = "NORMAL"
-    reason = "All telemetry channels within baseline nominal parameters."
-    anomaly_score = 0.05
+    # Strict condition: MQ sensor 1200+ OR smoke/gas hazard detected
+    is_smoke_or_gas = (mq1 >= 1200) or (mq2 >= 1200) or hazard or gas_event
 
-    # 1. Critical: Occupancy detected inside active gas leak zone
-    if (hazard or gas_event) and occupancy:
+    if is_smoke_or_gas:
         is_anomaly = True
-        severity = "CRITICAL"
-        reason = "CRITICAL: Human/Object occupancy detected inside active gas hazard compartment!"
-        anomaly_score = 0.98
-
-    # 2. High: Verified Smoke / Gas Surge
-    elif hazard or gas_event or (mq1 >= 1200) or (mq2 >= 1200):
-        is_anomaly = True
-        severity = "HIGH"
-        reason = f"HAZARD: Elevated gas/smoke surge detected (MQ1: {mq1}, MQ2: {mq2}). Exhaust ventilation activated."
-        anomaly_score = 0.85
-
-    # 3. Warning: Thermal threshold surge
-    elif temp is not None and temp > 50.0:
-        is_anomaly = True
-        severity = "WARNING"
-        reason = f"WARNING: Thermal anomaly detected ({temp:.1f}°C) exceeding compartment threshold."
-        anomaly_score = 0.65
+        if occupancy:
+            severity = "CRITICAL"
+            reason = f"CRITICAL: Smoke/Gas hazard detected (MQ1: {mq1}, MQ2: {mq2}) with compartment occupancy!"
+            anomaly_score = 0.98
+        else:
+            severity = "HIGH"
+            reason = f"HAZARD: Elevated smoke/gas spike detected (MQ1: {mq1}, MQ2: {mq2} >= 1200). Exhaust ventilation activated."
+            anomaly_score = 0.85
+    else:
+        is_anomaly = False
+        severity = "NORMAL"
+        reason = "Nominal baseline - MQ sensors below 1200 ADC threshold and no smoke detected."
+        anomaly_score = 0.05
 
     return {
         "is_anomaly": is_anomaly,
@@ -146,7 +130,7 @@ async def ingest_live_telemetry(payload: ESP32TelemetryPayload):
     # 2. Database Persistence
     saved_record = save_telemetry_to_db(data_dict, anomaly_info)
 
-    # 3. Update alert queue if anomalous
+    # 3. Update alert queue strictly if anomalous
     if anomaly_info["is_anomaly"]:
         _latest_anomaly_alert = {
             "id": saved_record.get("id"),
@@ -158,8 +142,12 @@ async def ingest_live_telemetry(payload: ESP32TelemetryPayload):
             "temperature": data_dict.get("temperature"),
             "distance_cm": data_dict.get("distance_cm"),
             "occupancy": data_dict.get("occupancy_status"),
+            "hazard_detected": bool(data_dict.get("hazard_detected")),
             "timestamp": datetime.now().isoformat()
         }
+    else:
+        # Clear active alert when telemetry drops back below threshold
+        _latest_anomaly_alert = None
 
     return {
         "status": "success",
@@ -221,37 +209,59 @@ def get_telemetry_history(limit: int = Query(30, ge=5, le=200)):
 @router.get("/alerts")
 def get_live_alerts():
     """
-    Returns active/unacknowledged anomaly alerts for website notifications.
+    Returns active anomaly alerts STRICTLY when MQ sensor is >= 1200 or smoke hazard is detected.
     """
     global _latest_anomaly_alert
     
-    # Query the last 5 anomaly records from database
+    # Query the last 10 historical anomaly records for the log
     query = """
     SELECT * FROM live_sensor_telemetry 
     WHERE is_anomaly = TRUE 
     ORDER BY created_at DESC LIMIT 10;
     """
+    
+    # Query the single LATEST reading to determine current active state
+    latest_query = "SELECT * FROM live_sensor_telemetry ORDER BY created_at DESC LIMIT 1;"
+    
     with get_db_cursor() as cur:
         cur.execute(query)
         rows = [dict(r) for r in cur.fetchall()]
+        
+        cur.execute(latest_query)
+        latest_row = cur.fetchone()
 
     active_alert = None
+
+    # Check in-memory active alert first
     if _latest_anomaly_alert and _latest_anomaly_alert.get("id") not in _dismissed_alert_ids:
-        active_alert = _latest_anomaly_alert
-    elif rows and rows[0]["id"] not in _dismissed_alert_ids:
-        r = rows[0]
-        active_alert = {
-            "id": r["id"],
-            "device_id": r["device_id"],
-            "severity": "CRITICAL" if r.get("object_detected") else "HIGH",
-            "reason": r["anomaly_reason"],
-            "mq2_1": r["mq2_sensor_1"],
-            "mq2_2": r["mq2_sensor_2"],
-            "temperature": float(r["temperature"]) if r["temperature"] else None,
-            "distance_cm": float(r["distance_cm"]) if r["distance_cm"] else None,
-            "occupancy": r["occupancy_status"],
-            "timestamp": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"])
-        }
+        mq1 = _latest_anomaly_alert.get("mq2_1") or 0
+        mq2 = _latest_anomaly_alert.get("mq2_2") or 0
+        haz = _latest_anomaly_alert.get("hazard_detected")
+        if (mq1 >= 1200) or (mq2 >= 1200) or haz:
+            active_alert = _latest_anomaly_alert
+
+    # If memory is clear, check whether the latest database reading is currently in an active hazard state
+    elif latest_row and latest_row["id"] not in _dismissed_alert_ids:
+        r = dict(latest_row)
+        mq1 = r.get("mq2_sensor_1") or 0
+        mq2 = r.get("mq2_sensor_2") or 0
+        haz = bool(r.get("hazard_detected")) or bool(r.get("gas_event"))
+        
+        # STRICT CONDITION: Alert ONLY if MQ >= 1200 or smoke hazard detected
+        if (mq1 >= 1200) or (mq2 >= 1200) or haz:
+            active_alert = {
+                "id": r["id"],
+                "device_id": r["device_id"],
+                "severity": "CRITICAL" if r.get("object_detected") else "HIGH",
+                "reason": r["anomaly_reason"],
+                "mq2_1": mq1,
+                "mq2_2": mq2,
+                "temperature": float(r["temperature"]) if r["temperature"] else None,
+                "distance_cm": float(r["distance_cm"]) if r["distance_cm"] else None,
+                "occupancy": r["occupancy_status"],
+                "hazard_detected": haz,
+                "timestamp": r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"])
+            }
 
     return {
         "active_alert": active_alert,

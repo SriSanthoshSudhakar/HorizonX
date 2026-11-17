@@ -98,7 +98,7 @@ const Dashboard = () => {
               <strong className="text-white font-mono">{latestData?.device_id || 'HORIZONX_ESP32_01'}</strong>
               <span>•</span>
               <Wifi className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Target: <code className="text-neutral-300">10.135.195.220:8000/api/sensor-data</code></span>
+              <span>Target: <code className="text-neutral-300">10.183.170.220:8000/api/sensor-data</code></span>
               {lastFetchTime && <span>• Updated: {lastFetchTime}</span>}
             </p>
           </div>
