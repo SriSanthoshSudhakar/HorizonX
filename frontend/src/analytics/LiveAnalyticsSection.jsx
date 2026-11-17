@@ -23,7 +23,6 @@ export const LiveAnalyticsSection = () => {
   const [latestData, setLatestData] = useState(null);
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isSimulating, setIsSimulating] = useState(false);
   const [lastFetchTime, setLastFetchTime] = useState(null);
 
   const fetchData = async () => {
@@ -56,19 +55,6 @@ export const LiveAnalyticsSection = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const triggerSimulation = async (scenario) => {
-    setIsSimulating(true);
-    try {
-      await fetch(`${API_BASE}/api/live/simulate?scenario=${scenario}`, {
-        method: 'POST'
-      });
-      await fetchData();
-    } catch (e) {
-      console.error('Simulation error:', e);
-    } finally {
-      setIsSimulating(false);
-    }
-  };
 
   const isHazard = latestData?.hazard_detected || (latestData?.mq2_sensor_1 >= 1200) || (latestData?.mq2_sensor_2 >= 1200);
   const isOccupancy = latestData?.object_detected || latestData?.occupancy_status === 'POSSIBLE_OCCUPANCY';
@@ -249,48 +235,15 @@ export const LiveAnalyticsSection = () => {
           </p>
         </div>
 
-        {/* Hardware Status + Subtle Simulation Controls */}
+        {/* Actions */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs text-slate-600 font-mono shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>{latestData?.device_id || 'ESP32_01'}</span>
-            <span className="text-slate-300">|</span>
-            <span className="text-[10px] text-slate-400">10.183.170.220:8000</span>
-          </div>
-
-          <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
-            <button
-              onClick={() => triggerSimulation('normal')}
-              disabled={isSimulating}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-mono text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 transition cursor-pointer shadow-2xs"
-              title="Simulate nominal baseline packet"
-            >
-              Normal
-            </button>
-            <button
-              onClick={() => triggerSimulation('gas_leak')}
-              disabled={isSimulating}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-mono text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition cursor-pointer shadow-2xs"
-              title="Simulate volatile gas surge packet"
-            >
-              Gas Spike
-            </button>
-            <button
-              onClick={() => triggerSimulation('occupancy_hazard')}
-              disabled={isSimulating}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-mono text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer shadow-2xs"
-              title="Simulate occupancy alert in active gas zone"
-            >
-              Occupancy
-            </button>
-            <button
-              onClick={fetchData}
-              title="Refresh telemetry"
-              className="p-1 rounded-lg text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 transition cursor-pointer shadow-2xs"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={fetchData}
+            title="Refresh telemetry"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 transition cursor-pointer shadow-2xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
